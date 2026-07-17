@@ -101,42 +101,84 @@ export const getPostBySlug = async (req, res) => {
 
 export const updatePost = async (req, res) => {
   try {
-    const updates = { ...req.body };
-
-    let newImages = [];
-    if (req.files && req.files["images"]) {
-      const uploadedImages = Array.isArray(req.files["images"])
-        ? req.files["images"]
-        : [req.files["images"]];
-      newImages = uploadedImages.map((file) => file.location || file.path);
+    const {
+      title,
+      excerpt,
+      content,
+      author,
+      category,
+      isBreaking,
+      isTrending,
+      isFeatured,
+      isEditorsPick,
+    } = req.body;
+ 
+    const toArray = (val) => {
+      if (!val) return [];
+      return Array.isArray(val) ? val : [val];
+    };
+ 
+    // Only set fields that were actually sent, instead of blindly
+    // spreading req.body (which also contains helper fields like
+    // existingImages/existingVideos/existingVideoImage that aren't
+    // real schema fields).
+    const updates = {};
+ 
+    if (title !== undefined) updates.title = title;
+    if (excerpt !== undefined) updates.excerpt = excerpt;
+    if (content !== undefined) updates.content = content;
+    if (author !== undefined) updates.author = author;
+    if (category !== undefined) updates.category = category || null;
+    if (req.body.tags !== undefined) updates.tags = toArray(req.body.tags);
+ 
+    if (isBreaking !== undefined) updates.isBreaking = isBreaking === "true";
+    if (isTrending !== undefined) updates.isTrending = isTrending === "true";
+    if (isFeatured !== undefined) updates.isFeatured = isFeatured === "true";
+    if (isEditorsPick !== undefined) updates.isEditorsPick = isEditorsPick === "true";
+ 
+    /* -------------------- IMAGES -------------------- */
+    const newImages = req.files?.images
+      ? req.files.images.map((f) => f.location || f.filename)
+      : [];
+    const keptImages = req.body.existingImages
+      ? JSON.parse(req.body.existingImages)
+      : [];
+ 
+    // Apply if either new images were uploaded, or the frontend told us
+    // which existing images to keep (covers pure-removal case too)
+    if (newImages.length > 0 || req.body.existingImages !== undefined) {
+      updates.images = [...keptImages, ...newImages];
     }
-
-    let newVideos = [];
-    if (req.files && req.files["videos"]) {
-      const uploadedVideos = Array.isArray(req.files["videos"])
-        ? req.files["videos"]
-        : [req.files["videos"]];
-      newVideos = uploadedVideos.map((file) => file.location || file.path);
+ 
+    /* -------------------- VIDEOS -------------------- */
+    const newVideos = req.files?.videos
+      ? req.files.videos.map((f) => f.location || f.filename)
+      : [];
+    const keptVideos = req.body.existingVideos
+      ? JSON.parse(req.body.existingVideos)
+      : [];
+ 
+    if (newVideos.length > 0 || req.body.existingVideos !== undefined) {
+      updates.videos = [...keptVideos, ...newVideos];
     }
-
-    if (newImages.length > 0) {
-      updates.images = [
-        ...(req.body.existingImages ? JSON.parse(req.body.existingImages) : []),
-        ...newImages,
-      ];
+ 
+    /* -------------------- VIDEO THUMBNAIL -------------------- */
+    if (req.files?.videoImage?.[0]) {
+      updates.videoImage =
+        req.files.videoImage[0].location || req.files.videoImage[0].filename;
+    } else if (req.body.existingVideoImage !== undefined) {
+      updates.videoImage = req.body.existingVideoImage;
     }
-
-    if (newVideos.length > 0) {
-      updates.videos = [
-        ...(req.body.existingVideos ? JSON.parse(req.body.existingVideos) : []),
-        ...newVideos,
-      ];
-    }
-
+ 
     const updated = await DbPost.findByIdAndUpdate(req.params.id, updates, {
       new: true,
+      runValidators: true,
     });
-
+ 
+    if (!updated) {
+      return res.status(404).json({ message: "Post not found" });
+    }
+ 
     res.json(updated);
   } catch (err) {
     console.error("❌ Error updating post:", err);
