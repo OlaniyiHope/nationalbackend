@@ -115,6 +115,10 @@ app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 const allowedOrigins = [
   "https://admin.rayofaa.com",
   "http://localhost:3000",
+  "https://nationaladmin.vercel.app/",
+  "https://nationalfrontend.vercel.app/",
+  "https://nationaldailynewspaper.com",
+  "https://www.nationaldailynewspaper.com",
   "http://localhost:5173",
   "http://localhost:8081",
 ];
