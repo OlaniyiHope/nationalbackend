@@ -50,28 +50,25 @@ const upload = multer({
     s3,
     bucket: "edupros",
     contentType: multerS3.AUTO_CONTENT_TYPE,
-  key: (req, file, cb) => {
+    key: (req, file, cb) => {
+      let folder = "Dbnewspaper";
 
-  let folder = "Dbnewspaper";
+      if (file.fieldname === "videos") {
+        folder = "Dbnewspaper-videos";
+      }
 
-  if(file.fieldname === "videos"){
-    folder = "Dbnewspaper-videos";
-  }
+      if (file.fieldname === "videoImage") {
+        folder = "Dbnewspaper-video-thumbnails";
+      }
 
-  if(file.fieldname === "videoImage"){
-    folder = "Dbnewspaper-video-thumbnails";
-  }
+      const cleanName = file.originalname
+        .replace(/\s+/g, "-")
+        .replace(/[^a-zA-Z0-9.-]/g, "");
 
+      const fileKey = `${folder}/${Date.now()}-${cleanName}`;
 
-  const cleanName = file.originalname
-    .replace(/\s+/g, "-")
-    .replace(/[^a-zA-Z0-9.-]/g, "");
-
-
-  const fileKey = `${folder}/${Date.now()}-${cleanName}`;
-
-  cb(null, fileKey);
-}
+      cb(null, fileKey);
+    },
   }),
   limits: {
     fileSize: MAX_VIDEO_SIZE, // applies to the largest allowed file across all fields
@@ -83,19 +80,21 @@ const upload = multer({
     if (file.fieldname === "videos" && !file.mimetype.startsWith("video/")) {
       return cb(new Error("Only video files are allowed for the videos field"));
     }
+    if (file.fieldname === "videoImage" && !file.mimetype.startsWith("image/")) {
+      return cb(new Error("Only image files are allowed for the videoImage field"));
+    }
     cb(null, true);
   },
 });
 
-router.post(
-  "/create-post",
-  upload.fields([
-    { name: "images", maxCount: 5 },
-    { name: "videos", maxCount: 2 },
-     { name: "videoImage", maxCount: 1 },
-  ]),
-  createPost
-);
+// Shared field config so create and update always accept the same fields
+const postUploadFields = upload.fields([
+  { name: "images", maxCount: 5 },
+  { name: "videos", maxCount: 2 },
+  { name: "videoImage", maxCount: 1 },
+]);
+
+router.post("/create-post", postUploadFields, createPost);
 
 router.get("/posts", getPosts);
 router.get("/post/:id", getPostById);
@@ -108,14 +107,7 @@ router.get("/posts/featured", getFeaturedPosts);
 router.get("/posts/editors-pick", getEditorsPickPosts);
 router.get("/posts/tag/:tag", getPostsByTag);
 
-router.put(
-  "/post/:id",
-  upload.fields([
-    { name: "images", maxCount: 10 },
-    { name: "videos", maxCount: 3 },
-  ]),
-  updatePost
-);
+router.put("/post/:id", postUploadFields, updatePost);
 
 router.delete("/post/:id", deletePost);
 
